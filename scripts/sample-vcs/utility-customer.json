@@ -1,0 +1,29 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://ies.gov.in/credentials/v1"
+  ],
+  "id": "urn:uuid:597dd17b-07ce-427e-b303-9eb2cc93763a",
+  "type": ["VerifiableCredential", "UtilityCustomerCredential"],
+  "issuer": {
+    "id": "did:example:ies-utility-authority",
+    "name": "India Energy Stack - Utility Authority"
+  },
+  "issuanceDate": "2024-01-05T11:00:00Z",
+  "credentialSubject": {
+    "id": "did:example:customer-neha",
+    "fullName": "Neha Sample",
+    "fullAddress": "Green avenue, 10th cross road, Odisha",
+    "meterNumber": "MTR-UTL-2020-0234",
+    "consumerNumber": "CON-2020-56789",
+    "maskedIdNumber": "XXXX-XXXX-1234",
+    "serviceConnectionDate": "2020-12-22"
+  },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2024-01-05T11:00:00Z",
+    "verificationMethod": "did:example:ies-utility-authority#key-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "zUtilityCustomerProof..."
+  }
+}

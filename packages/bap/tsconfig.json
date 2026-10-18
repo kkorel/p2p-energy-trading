@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@p2p/shared": [
+        "../shared/src"
+      ]
+    },
+    "types": [
+      "node"
+    ],
+    "noImplicitAny": false
+  },
+  "include": [
+    "src/**/*",
+    "../shared/src/**/*"
+  ],
+  "exclude": [
+    "../shared/src/tests/**/*",
+    "../shared/src/**/*.test.ts",
+    "../shared/src/**/*.spec.ts",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}

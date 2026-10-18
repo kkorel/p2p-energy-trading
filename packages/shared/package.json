@@ -1,0 +1,36 @@
+{
+  "name": "@p2p/shared",
+  "version": "1.0.0",
+  "description": "Shared types and utilities for P2P Energy Trading",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "db:generate": "prisma generate --schema=prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema=prisma/schema.prisma",
+    "db:migrate:dev": "prisma migrate dev --schema=prisma/schema.prisma",
+    "db:push": "prisma db push --schema=prisma/schema.prisma",
+    "db:studio": "prisma studio --schema=prisma/schema.prisma",
+    "test": "cd ../.. && jest packages/shared",
+    "test:concurrency": "cd ../.. && jest --testPathPattern=concurrency --runInBand"
+  },
+  "dependencies": {
+    "@digitalbazaar/ed25519-signature-2020": "^4.0.0",
+    "@prisma/client": "^5.22.0",
+    "dotenv": "^17.2.3",
+    "geotiff": "^3.0.0",
+    "ioredis": "^5.4.1",
+    "jsonld": "^9.0.0",
+    "pngjs": "^7.0.0",
+    "redlock": "^5.0.0-beta.2",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "@types/pngjs": "^6.0.5",
+    "@types/uuid": "^9.0.8",
+    "prisma": "^5.22.0",
+    "typescript": "^5.3.3"
+  }
+}

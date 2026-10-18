@@ -1,0 +1,46 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://ies.gov.in/credentials/v1"
+  ],
+  "id": "urn:uuid:cd356c76-solar-generation-priya",
+  "type": ["VerifiableCredential", "GenerationProfileCredential"],
+  "issuer": {
+    "id": "did:example:ies-energy-authority",
+    "name": "India Energy Stack - Credential Authority"
+  },
+  "issuanceDate": "2024-02-20T10:30:00Z",
+  "credentialSubject": {
+    "id": "did:example:prosumer-priya-sample",
+    "providerId": "provider-priya-001",
+    "providerName": "PRIYA SAMPLE",
+    "installedCapacityKW": 23,
+    "authorizedCapacityKW": 25,
+    "sourceType": "SOLAR",
+    "sourceDescription": "Rooftop Solar PV System",
+    "commissioningDate": "2023-08-15",
+    "gridConnectionStatus": "CONNECTED",
+    "meterId": "MTR-SOL-2023-0456",
+    "distributionUtility": "TATA Power",
+    "connectionVoltage": "240V",
+    "location": {
+      "state": "Maharashtra",
+      "district": "Mumbai",
+      "pincode": "400001"
+    },
+    "certifications": [
+      {
+        "type": "Net Metering Approval",
+        "issuedBy": "MERC",
+        "validUntil": "2028-08-15"
+      }
+    ]
+  },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2024-02-20T10:30:00Z",
+    "verificationMethod": "did:example:ies-energy-authority#key-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z58DAdFfa9SkqZMVPxAQpic7ndTeLv3Y..."
+  }
+}

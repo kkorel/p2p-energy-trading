@@ -1,0 +1,42 @@
+{
+  "name": "@p2p/bap",
+  "version": "1.0.0",
+  "description": "Beckn Application Platform (Consumer + Provider) for P2P Energy Trading",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "seed": "ts-node src/seed.ts",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "@p2p/shared": "^1.0.0",
+    "@types/hapi__boom": "^7.4.1",
+    "node-cron": "^3.0.3",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "axios": "^1.6.7",
+    "express": "^4.18.2",
+    "form-data": "^4.0.5",
+    "jsonpath-plus": "10.3.0",
+    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^5.4.530",
+    "qrcode-terminal": "^0.12.0",
+    "telegraf": "^4.16.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node-cron": "^3.0.11",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.16",
+    "@types/supertest": "^6.0.3",
+    "@types/uuid": "^9.0.8",
+    "jest": "^29.7.0",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

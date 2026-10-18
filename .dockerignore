@@ -1,0 +1,70 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts (keep dist for local, Docker builds fresh)
+*.tsbuildinfo
+
+# Large folders not needed for backend build
+out
+
+# Web package contents (not needed for bap build, but keep dir for dummy package.json)
+packages/web/src
+packages/web/public
+packages/web/.next
+packages/web/node_modules
+
+# Test files
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+**/tests/**
+**/__tests__/**
+
+# Secrets and local state (never copy into an image)
+**/.env*
+!.env.example
+.claude
+packages/bap/.whatsapp-auth
+packages/bap/uploads
+
+# Generated / runtime output (the Dockerfile runs prisma generate itself)
+packages/shared/src/generated
+packages/*/dist
+**/test-results
+**/playwright-report
+**/*.tmp*
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Compiled JavaScript files in src (TypeScript should compile these fresh)
+packages/shared/src/**/*.js
+packages/shared/src/**/*.d.ts
+
+# Database files (SQLite)
+*.db
+*.db-journal
+
+# Logs
+logs
+*.log
+
+# Documentation
+README.md
+docs

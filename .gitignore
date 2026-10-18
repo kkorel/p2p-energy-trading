@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+*.js.map
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
+# Environment (only the example is tracked)
+.env*
+!.env.example
+
+# Keys and credentials
+*.pem
+*.key
+dedi-keys*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test output and build caches
+coverage/
+test-results/
+playwright-report/
+.next/
+*.tsbuildinfo
+
+# Runtime logs and diagnostics
+logs/
+diagnosis-results.json
+
+# Local AI-assistant settings
+.claude/
+
+# Temporary files
+tmp/
+temp/
+*.tmp*
+
+# TypeScript build artifacts in src
+packages/*/src/**/*.js
+packages/*/src/**/*.d.ts
+
+# Uploads folder (runtime)
+packages/bap/uploads/
+
+# WhatsApp Baileys auth state (contains session credentials)
+packages/bap/.whatsapp-auth/
+
+# Generated Prisma client (run `npm run db:generate`)
+packages/shared/src/generated/

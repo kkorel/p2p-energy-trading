@@ -1,0 +1,29 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://ies.gov.in/credentials/v1"
+  ],
+  "id": "urn:uuid:970b8948-consumption-ravi",
+  "type": ["VerifiableCredential", "ConsumptionProfileCredential"],
+  "issuer": {
+    "id": "did:example:ies-utility-authority",
+    "name": "India Energy Stack - Utility Authority"
+  },
+  "issuanceDate": "2024-03-01T08:00:00Z",
+  "credentialSubject": {
+    "id": "did:example:consumer-ravi-sample",
+    "fullName": "Ravi Sample",
+    "meterNumber": "MTR-CON-2024-0789",
+    "premisesType": "Residential",
+    "connectionType": "Single Phase",
+    "sanctionedLoadKW": 13,
+    "tariffCategory": "LT-1A"
+  },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2024-03-01T08:00:00Z",
+    "verificationMethod": "did:example:ies-utility-authority#key-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "zABCdef123456789..."
+  }
+}

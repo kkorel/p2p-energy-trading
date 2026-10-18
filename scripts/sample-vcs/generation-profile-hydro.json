@@ -1,0 +1,39 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://ies.gov.in/credentials/v1"
+  ],
+  "id": "urn:uuid:e0630c1e-hydro-generation-meera",
+  "type": ["VerifiableCredential", "GenerationProfileCredential"],
+  "issuer": {
+    "id": "did:example:ies-energy-authority",
+    "name": "India Energy Stack - Credential Authority"
+  },
+  "issuanceDate": "2024-01-15T09:00:00Z",
+  "credentialSubject": {
+    "id": "did:example:prosumer-meera",
+    "providerId": "provider-meera-001",
+    "providerName": "Meera Sample",
+    "installedCapacityKW": 23,
+    "authorizedCapacityKW": 25,
+    "sourceType": "HYDRO",
+    "sourceDescription": "MicroHydro Generation Unit",
+    "commissioningDate": "2023-06-01",
+    "gridConnectionStatus": "CONNECTED",
+    "meterId": "MTR-HYD-2023-0123",
+    "distributionUtility": "NHPC Ltd",
+    "connectionVoltage": "415V",
+    "location": {
+      "state": "Uttarakhand",
+      "district": "Dehradun",
+      "pincode": "248001"
+    }
+  },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2024-01-15T09:00:00Z",
+    "verificationMethod": "did:example:ies-energy-authority#key-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z3FXQjecWufY46yg7vp2E2rYcdxLp..."
+  }
+}

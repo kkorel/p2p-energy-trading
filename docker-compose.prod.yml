@@ -1,0 +1,104 @@
+version: '3.8'
+
+# Production Docker Compose configuration
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: p2p-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-p2p_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-p2p_password}
+      POSTGRES_DB: ${POSTGRES_DB:-p2p_trading}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-p2p_user} -d ${POSTGRES_DB:-p2p_trading}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - p2p-network
+
+  redis:
+    image: redis:7
+    container_name: p2p-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - p2p-network
+
+  bap:
+    build:
+      context: .
+      dockerfile: packages/bap/Dockerfile
+    container_name: p2p-bap
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - DEV_MODE=${DEV_MODE:-false}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-p2p_user}:${POSTGRES_PASSWORD:-p2p_password}@postgres:5432/${POSTGRES_DB:-p2p_trading}
+      - REDIS_URL=redis://redis:6379
+      - BAP_PORT=4000
+      - EXTERNAL_CDS_URL=${EXTERNAL_CDS_URL:-https://34.93.141.21.sslip.io/beckn/catalog}
+      - BAP_URL=http://bap:4000
+      - BPP_URL=http://bap:4000
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+      - DISCOM_RATE_PER_KWH=${DISCOM_RATE_PER_KWH:-10}
+      - DISCOM_CHECK_INTERVAL_MS=${DISCOM_CHECK_INTERVAL_MS:-60000}
+      - DISCOM_SUCCESS_RATE=${DISCOM_SUCCESS_RATE:-0.85}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+    volumes:
+      - uploads_data:/app/packages/bap/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - p2p-network
+
+  web:
+    build:
+      context: .
+      dockerfile: packages/web/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+    container_name: p2p-web
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - bap
+    restart: unless-stopped
+    networks:
+      - p2p-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
+
+networks:
+  p2p-network:
+    driver: bridge

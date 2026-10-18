@@ -1,0 +1,635 @@
+// Prisma Schema for P2P Energy Trading
+// PostgreSQL database with proper relations and indexes
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Authentication Models
+// ============================================
+
+model User {
+  id              String    @id @default(uuid())
+  phone           String    @unique
+  name            String?
+  profileComplete Boolean   @default(false) @map("profile_complete")
+  balance         Float     @default(10000) // Account balance in INR
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  lastLoginAt     DateTime? @map("last_login_at")
+
+  // Trust score system (like credit score)
+  trustScore          Float     @default(0.3) @map("trust_score")          // 0.0 - 1.0
+  allowedTradeLimit   Float     @default(10.0) @map("allowed_trade_limit") // % of surplus allowed
+  baselineTrustScore  Float     @default(0.3) @map("baseline_trust_score") // Initial score from meter analysis
+  meterDataAnalyzed   Boolean   @default(false) @map("meter_data_analyzed")
+  
+  // Production capacity (kWh per month)
+  productionCapacity    Float?    @map("production_capacity")       // User-declared production
+  meterVerifiedCapacity Float?    @map("meter_verified_capacity")   // Verified from meter PDF
+  meterPdfUrl           String?   @map("meter_pdf_url")             // Uploaded meter PDF path
+
+  // Multi-credential onboarding fields
+  // From UtilityCustomerCredential
+  consumerNumber        String?   @map("consumer_number")
+  meterNumber           String?   @map("meter_number")
+  installationAddress   String?   @map("installation_address")
+  serviceConnectionDate DateTime? @map("service_connection_date")
+
+  // From ConsumptionProfileCredential
+  premisesType          String?   @map("premises_type")        // Residential/Commercial/Industrial/Agricultural
+  connectionType        String?   @map("connection_type")      // Single-phase/Three-phase
+  sanctionedLoadKW      Float?    @map("sanctioned_load_kw")
+  tariffCategoryCode    String?   @map("tariff_category_code")
+
+  // From StorageProfileCredential
+  storageCapacityKWh    Float?    @map("storage_capacity_kwh")
+  storagePowerRatingKW  Float?    @map("storage_power_rating_kw")
+  storageType           String?   @map("storage_type")         // LithiumIon/LeadAcid/FlowBattery/Other
+
+  // From UtilityProgramEnrollmentCredential
+  programName           String?   @map("program_name")
+  programCode           String?   @map("program_code")
+  programEnrollmentDate DateTime? @map("program_enrollment_date")
+  programValidUntil     DateTime? @map("program_valid_until")
+
+  // Chat preferences (persisted across sessions)
+  languagePreference String? @map("language_preference") // e.g. 'en-IN', 'hi-IN', 'hinglish'
+
+  // Notification preferences
+  notifyOrderUpdates    Boolean @default(true) @map("notify_order_updates")     // Order confirmations, completions
+  notifyPayments        Boolean @default(true) @map("notify_payments")          // Payment escrow, release
+  notifyTradingAlerts   Boolean @default(false) @map("notify_trading_alerts")   // Price alerts, opportunities
+  notifyWeeklyDigest    Boolean @default(false) @map("notify_weekly_digest")    // Weekly summary
+  priceAlertThreshold   Float?  @map("price_alert_threshold")                   // Alert when price hits this
+  
+  // Trading preferences
+  preferredTradingStart String? @map("preferred_trading_start")  // e.g. "06:00"
+  preferredTradingEnd   String? @map("preferred_trading_end")    // e.g. "18:00"
+  autoListEnabled       Boolean @default(false) @map("auto_list_enabled")       // Auto-create listings
+
+  // WhatsApp integration
+  whatsappWelcomeSent   Boolean @default(false) @map("whatsapp_welcome_sent")  // First login welcome sent
+
+  // Prosumer can be both provider and consumer
+  provider   Provider? @relation(fields: [providerId], references: [id])
+  providerId String?   @unique @map("provider_id")
+
+  // User's orders as buyer
+  orders      Order[]
+  sessions    Session[]
+  credentials UserCredential[]
+  trustHistory    TrustScoreHistory[]
+  discomFeedback  DiscomFeedback[]
+  buyerPayments  PaymentRecord[] @relation("BuyerPayments")
+  sellerPayments PaymentRecord[] @relation("SellerPayments")
+
+  // Auto-trade relations
+  sellerAutoTradeConfig SellerAutoTradeConfig?
+  buyerAutoTradeConfig  BuyerAutoTradeConfig?
+  solarMaintenanceLogs  SolarMaintenanceLog[]
+
+  // Solar analysis data (from Google Solar API during onboarding)
+  solarAnalysis         UserSolarAnalysis?
+
+  @@index([phone])
+  @@map("users")
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  token      String   @unique
+  deviceInfo String?  @map("device_info")
+  ipAddress  String?  @map("ip_address")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ============================================
+// Verifiable Credentials
+// ============================================
+
+enum CredentialType {
+  UTILITY_CUSTOMER
+  CONSUMPTION_PROFILE
+  GENERATION_PROFILE
+  STORAGE_PROFILE
+  PROGRAM_ENROLLMENT
+}
+
+model UserCredential {
+  id              String         @id @default(uuid())
+  userId          String         @map("user_id")
+  credentialType  CredentialType @map("credential_type")
+  rawJson         String         @map("raw_json")
+  verified        Boolean        @default(false)
+  verifiedAt      DateTime?      @map("verified_at")
+  extractedClaims String?        @map("extracted_claims")
+  issuerId        String?        @map("issuer_id")
+  issuanceDate    DateTime?      @map("issuance_date")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, credentialType])
+  @@index([userId])
+  @@map("user_credentials")
+}
+
+// ============================================
+// Business Models
+// ============================================
+
+model Provider {
+  id               String   @id
+  name             String
+  trustScore       Float    @default(0.5) @map("trust_score")
+  totalOrders      Int      @default(0) @map("total_orders")
+  successfulOrders Int      @default(0) @map("successful_orders")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // From GenerationProfileCredential
+  generationType        String?   @map("generation_type")         // Solar, Wind, MicroHydro, Other
+  capacityKW            Float?    @map("capacity_kw")             // Installed generation capacity
+  generationMeterNumber String?   @map("generation_meter_number") // Meter for generation asset
+  commissioningDate     DateTime? @map("commissioning_date")      // When system was activated
+
+  // From StorageProfileCredential
+  storageCapacityKWh    Float?    @map("storage_capacity_kwh")
+  storagePowerRatingKW  Float?    @map("storage_power_rating_kw")
+  storageType           String?   @map("storage_type")            // LithiumIon, LeadAcid, FlowBattery, Other
+
+  // From UtilityCustomerCredential (via linked User)
+  consumerNumber        String?   @map("consumer_number")
+  installationAddress   String?   @map("installation_address")
+
+  // Link to user (prosumer who created this provider profile)
+  user User?
+
+  items  CatalogItem[]
+  offers CatalogOffer[]
+  orders Order[]
+  blocks OfferBlock[]
+
+  @@map("providers")
+}
+
+model CatalogItem {
+  id                    String   @id
+  providerId            String   @map("provider_id")
+  sourceType            String   @map("source_type")
+  deliveryMode          String   @map("delivery_mode")
+  availableQty          Float    @map("available_qty")
+  meterId               String?  @map("meter_id")
+  productionWindowsJson String   @map("production_windows_json")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  provider Provider       @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  offers   CatalogOffer[]
+  blocks   OfferBlock[]
+
+  @@index([providerId])
+  @@map("catalog_items")
+}
+
+model CatalogOffer {
+  id              String   @id
+  itemId          String   @map("item_id")
+  providerId      String   @map("provider_id")
+  priceValue      Float    @map("price_value")
+  currency        String   @default("INR")
+  maxQty          Float    @map("max_qty")
+  timeWindowStart DateTime @map("time_window_start")
+  timeWindowEnd   DateTime @map("time_window_end")
+  pricingModel    String   @default("PER_KWH") @map("pricing_model")
+  settlementType  String   @default("DAILY") @map("settlement_type")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  item     CatalogItem  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  provider Provider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  blocks   OfferBlock[]
+  orders   Order[]
+
+  @@index([itemId])
+  @@index([providerId])
+  @@map("catalog_offers")
+}
+
+model OfferBlock {
+  id            String    @id
+  offerId       String    @map("offer_id")
+  itemId        String    @map("item_id")
+  providerId    String    @map("provider_id")
+  status        String    @default("AVAILABLE")
+  orderId       String?   @map("order_id")
+  transactionId String?   @map("transaction_id")
+  priceValue    Float     @map("price_value")
+  currency      String    @default("INR")
+  version       Int       @default(0) // Optimistic locking version
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  reservedAt    DateTime? @map("reserved_at")
+  soldAt        DateTime? @map("sold_at")
+
+  offer    CatalogOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  item     CatalogItem  @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  provider Provider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  order    Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([offerId])
+  @@index([offerId, status])
+  @@index([orderId])
+  @@index([transactionId])
+  @@map("offer_blocks")
+}
+
+model Order {
+  id              String   @id
+  transactionId   String   @unique @map("transaction_id")
+  providerId      String?  @map("provider_id")
+  selectedOfferId String?  @map("selected_offer_id")
+  buyerId         String?  @map("buyer_id") // User who placed the order
+  status          String   @default("DRAFT")
+  totalQty        Float?   @map("total_qty")
+  totalPrice      Float?   @map("total_price")
+  currency        String?
+  itemsJson       String   @map("items_json")
+  quoteJson       String   @map("quote_json")
+  version         Int      @default(0) // Optimistic locking version
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Bulk order grouping - links orders from same bulk purchase
+  bulkGroupId     String?   @map("bulk_group_id")
+
+  // Cancellation tracking
+  cancelledAt     DateTime? @map("cancelled_at")
+  cancelledBy     String?   @map("cancelled_by")  // 'BUYER' | 'SELLER' | 'SYSTEM'
+  cancelReason    String?   @map("cancel_reason")
+  cancelPenalty   Float?    @map("cancel_penalty") // Total penalty amount
+  cancelRefund    Float?    @map("cancel_refund")  // Amount refunded to buyer
+
+  // Payment tracking (escrow)
+  paymentStatus   String    @default("PENDING") @map("payment_status") // PENDING | ESCROWED | RELEASED | REFUNDED
+  escrowedAt      DateTime? @map("escrowed_at")
+  releasedAt      DateTime? @map("released_at")
+
+  // DISCOM verification
+  discomVerified  Boolean   @default(false) @map("discom_verified")
+
+  provider      Provider?     @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  selectedOffer CatalogOffer? @relation(fields: [selectedOfferId], references: [id], onDelete: SetNull)
+  buyer         User?         @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+  blocks        OfferBlock[]
+  payments      PaymentRecord[]
+
+  @@index([providerId])
+  @@index([buyerId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([bulkGroupId])
+  @@map("orders")
+}
+
+model Event {
+  id            Int      @id @default(autoincrement())
+  transactionId String   @map("transaction_id")
+  messageId     String   @map("message_id")
+  action        String
+  direction     String
+  rawJson       String   @map("raw_json")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([transactionId])
+  @@index([messageId, direction])
+  @@map("events")
+}
+
+// ============================================
+// Settlement Records (Phase 4 - Payment Flow)
+// ============================================
+
+model SettlementRecord {
+  id                  String    @id @default(uuid())
+  tradeId             String    @unique @map("trade_id")
+  orderId             String?   @map("order_id")
+  transactionId       String?   @map("transaction_id")
+  buyerId             String?   @map("buyer_id")
+  sellerId            String?   @map("seller_id")
+  principal           Float
+  fee                 Float
+  total               Float
+  expiresAt           String?   @map("expires_at")
+  status              String    @default("INITIATED")
+  verificationOutcome String?   @map("verification_outcome")
+  fundedReceipt       String?   @map("funded_receipt")
+  payoutReceipt       String?   @map("payout_receipt")
+  fundedAt            String?   @map("funded_at")
+  verifiedAt          String?   @map("verified_at")
+  payoutAt            String?   @map("payout_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Verifiable Credentials metadata
+  vcId                String?   @map("vc_id")        // ID of the verified VC
+  vcIssuer            String?   @map("vc_issuer")    // DID of the VC issuer
+  vcVerifiedAt        String?   @map("vc_verified_at") // When VC was verified
+  vcClaims            String?   @map("vc_claims")    // JSON string of extracted claims
+
+  @@index([orderId])
+  @@index([transactionId])
+  @@index([status])
+  @@index([vcId])
+  @@map("settlement_records")
+}
+
+// ============================================
+// Trust Score System
+// ============================================
+
+model TrustScoreHistory {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  previousScore Float    @map("previous_score")
+  newScore      Float    @map("new_score")
+  previousLimit Float    @map("previous_limit")
+  newLimit      Float    @map("new_limit")
+  reason        String   // 'SIGNUP' | 'METER_ANALYSIS' | 'DELIVERY_SUCCESS' | 'DELIVERY_PARTIAL' | 'DELIVERY_FAILED' | 'BUYER_CANCEL'
+  orderId       String?  @map("order_id")
+  metadata      String?  // JSON with details (deliveredQty, expectedQty, etc)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orderId])
+  @@map("trust_score_history")
+}
+
+model DiscomFeedback {
+  id              String   @id @default(uuid())
+  orderId         String   @unique @map("order_id")
+  sellerId        String   @map("seller_id")
+  transactionId   String   @map("transaction_id")
+  deliveredQty    Float    @map("delivered_qty")
+  expectedQty     Float    @map("expected_qty")
+  deliveryRatio   Float    @map("delivery_ratio")  // deliveredQty/expectedQty
+  status          String   // 'FULL' | 'PARTIAL' | 'FAILED'
+  trustImpact     Float    @map("trust_impact")    // Actual penalty/bonus applied
+  verifiedAt      DateTime @map("verified_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  seller User @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@index([orderId])
+  @@map("discom_feedback")
+}
+
+// Payment records for tracking money flow
+model PaymentRecord {
+  id              String   @id @default(uuid())
+  type            String   // 'ESCROW' | 'RELEASE' | 'CANCEL_PENALTY' | 'REFUND' | 'SELLER_CANCEL_REFUND' | 'SELLER_CANCEL_PENALTY'
+  orderId         String   @map("order_id")
+  buyerId         String?  @map("buyer_id")
+  sellerId        String?  @map("seller_id")
+  
+  // Amounts
+  totalAmount     Float    @map("total_amount")     // Original order amount
+  buyerRefund     Float?   @map("buyer_refund")     // Amount returned to buyer
+  sellerAmount    Float?   @map("seller_amount")    // Amount paid to seller
+  platformFee     Float?   @map("platform_fee")     // Platform's share
+  
+  // Status
+  status          String   @default("PENDING")      // PENDING | COMPLETED | FAILED
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyer           User?    @relation("BuyerPayments", fields: [buyerId], references: [id], onDelete: SetNull)
+  seller          User?    @relation("SellerPayments", fields: [sellerId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([type])
+  @@map("payment_records")
+}
+
+// ============================================
+// Chat / Oorja Agent
+// ============================================
+
+enum ChatPlatform {
+  TELEGRAM
+  WEB
+  WHATSAPP
+}
+
+enum ChatState {
+  GREETING
+  ASK_VOICE_PREF
+  WAITING_PHONE
+  WAITING_OTP
+  WAITING_NAME
+  OTP_VERIFIED
+  EXPLAIN_VC
+  WAITING_VC_UPLOAD
+  VC_VERIFIED
+  CONFIRM_TRADING
+  TRADING_ACTIVE
+  GENERAL_CHAT
+  // New states for 5-credential flow
+  AUTHENTICATED
+  ASK_DISCOM
+  WAITING_UTILITY_CRED
+  ASK_INTENT
+  OFFER_OPTIONAL_CREDS
+  WAITING_OPTIONAL_CRED
+}
+
+model ChatSession {
+  id          String       @id @default(uuid())
+  userId      String?      @map("user_id")
+  platform    ChatPlatform
+  platformId  String?      @map("platform_id")
+  state       ChatState    @default(GREETING)
+  contextJson String       @default("{}") @map("context_json")
+  authToken   String?      @map("auth_token")
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  messages    ChatMessage[]
+
+  @@unique([platform, platformId])
+  @@index([userId])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id           String      @id @default(uuid())
+  sessionId    String      @map("session_id")
+  role         String
+  content      String
+  metadataJson String?     @map("metadata_json")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  session      ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("chat_messages")
+}
+
+// ============================================
+// Auto-Trade Agent System
+// ============================================
+
+model SellerAutoTradeConfig {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  enabled     Boolean  @default(false)
+  capacityKwh Float    @map("capacity_kwh")    // Total solar capacity
+  pricePerKwh Float    @map("price_per_kwh")   // Desired price per unit
+  minPrice    Float?   @map("min_price")       // Minimum acceptable price
+  energyType  String   @default("SOLAR") @map("energy_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions SellerAutoTradeExecution[]
+
+  @@map("seller_auto_trade_configs")
+}
+
+model SellerAutoTradeExecution {
+  id                String   @id @default(uuid())
+  configId          String   @map("config_id")
+  userId            String   @map("user_id")
+  executedAt        DateTime @default(now()) @map("executed_at")
+  weatherMultiplier Float    @map("weather_multiplier")   // 0.25-1.0 based on cloud cover
+  effectiveCapacity Float    @map("effective_capacity")   // tradeLimit × capacity × weatherMultiplier
+  listedQuantity    Float    @map("listed_quantity")      // What was actually listed
+  priceUsed         Float    @map("price_used")
+  status            String   // 'success', 'warning_oversell', 'skipped'
+  warningMessage    String?  @map("warning_message")      // Over-sell warning if any
+  offerId           String?  @map("offer_id")             // Created offer ID
+
+  config SellerAutoTradeConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@index([configId])
+  @@index([userId])
+  @@index([executedAt])
+  @@map("seller_auto_trade_executions")
+}
+
+model BuyerAutoTradeConfig {
+  id             String   @id @default(uuid())
+  userId         String   @unique @map("user_id")
+  enabled        Boolean  @default(false)
+  targetQuantity Float    @map("target_quantity")  // How many units to buy daily
+  maxPrice       Float    @map("max_price")        // Maximum acceptable price per unit
+  preferredTime  String?  @map("preferred_time")   // 'morning', 'afternoon', 'evening', or null for auto
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user       User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executions BuyerAutoTradeExecution[]
+
+  @@map("buyer_auto_trade_configs")
+}
+
+model BuyerAutoTradeExecution {
+  id             String   @id @default(uuid())
+  configId       String   @map("config_id")
+  userId         String   @map("user_id")
+  executedAt     DateTime @default(now()) @map("executed_at")
+  quantityBought Float    @map("quantity_bought")
+  pricePerUnit   Float    @map("price_per_unit")
+  totalSpent     Float    @map("total_spent")
+  status         String   // 'success', 'no_deals', 'price_too_high', 'error'
+  orderId        String?  @map("order_id")
+  error          String?  // Error message if status is 'error'
+
+  config BuyerAutoTradeConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@index([configId])
+  @@index([userId])
+  @@index([executedAt])
+  @@map("buyer_auto_trade_executions")
+}
+
+model SolarMaintenanceLog {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  action      String   // 'cleaned', 'inspected'
+  performedAt DateTime @default(now()) @map("performed_at")
+  reportedBy  String   @map("reported_by") // 'user', 'system'
+  notes       String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([performedAt])
+  @@map("solar_maintenance_logs")
+}
+
+// ============================================
+// Solar Analysis (Google Solar API)
+// ============================================
+
+model UserSolarAnalysis {
+  id                   String   @id @default(uuid())
+  userId               String   @unique @map("user_id")
+
+  // Location data
+  latitude             Float?
+  longitude            Float?
+  formattedAddress     String?  @map("formatted_address")
+
+  // Solar potential from Google Solar API
+  available            Boolean  @default(false)          // Whether Solar API returned data
+  maxSunshineHours     Float?   @map("max_sunshine_hours")      // Annual hours
+  maxPanelCount        Int?     @map("max_panel_count")
+  yearlyEnergyKwh      Float?   @map("yearly_energy_kwh")
+  roofAreaM2           Float?   @map("roof_area_m2")
+  imageryQuality       String?  @map("imagery_quality")         // HIGH, MEDIUM, LOW
+  carbonOffsetKg       Float?   @map("carbon_offset_kg")
+
+  // Calculated values
+  installationScore    Float    @default(0.5) @map("installation_score")  // 0.0-1.0
+  tradingLimitPercent  Float    @default(10) @map("trading_limit_percent") // 7-15%
+
+  // Verification
+  verificationMethod   String   @default("DEFAULT") @map("verification_method") // SOLAR_API or DEFAULT
+  errorReason          String?  @map("error_reason")
+
+  // Satellite image URL (for profile display)
+  satelliteImageUrl    String?  @map("satellite_image_url")
+
+  // Timestamps
+  analyzedAt           DateTime @default(now()) @map("analyzed_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_solar_analyses")
+}

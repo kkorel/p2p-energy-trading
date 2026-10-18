@@ -1,0 +1,28 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://ies.gov.in/credentials/v1"
+  ],
+  "id": "urn:uuid:9e0f8c94-storage-arjun",
+  "type": ["VerifiableCredential", "StorageProfileCredential"],
+  "issuer": {
+    "id": "did:example:ies-energy-authority",
+    "name": "India Energy Stack - Credential Authority"
+  },
+  "issuanceDate": "2024-02-10T14:00:00Z",
+  "credentialSubject": {
+    "id": "did:example:prosumer-arjun",
+    "fullName": "ARJUN SAMPLE",
+    "storageType": "FlowBattery",
+    "powerRatingKW": 23,
+    "storageCapacityKWh": 50,
+    "meterId": "MTR-STR-2024-0567"
+  },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2024-02-10T14:00:00Z",
+    "verificationMethod": "did:example:ies-energy-authority#key-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "zStorageProofValue..."
+  }
+}
